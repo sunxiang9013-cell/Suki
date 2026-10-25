@@ -1,0 +1,649 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>hello_world 本地电机测试</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101214;
+      --panel: #181b1f;
+      --line: #2b3138;
+      --text: #e7edf3;
+      --muted: #8d99a6;
+      --accent: #4fb3ff;
+      --danger: #ff6b6b;
+      --ok: #69d18c;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+      background: #15181c;
+    }
+    h1 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 650;
+    }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+    button, select, input {
+      height: 34px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--panel);
+      color: var(--text);
+      padding: 0 10px;
+      font: inherit;
+    }
+    button { cursor: pointer; }
+    button.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #061016;
+      font-weight: 650;
+    }
+    button.danger {
+      color: var(--danger);
+    }
+    button.ok {
+      color: var(--ok);
+    }
+    main {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 360px;
+      gap: 12px;
+      padding: 12px;
+      height: calc(100vh - 63px);
+    }
+    section {
+      min-height: 0;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 8px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .log-head, .side-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 13px;
+    }
+    #log {
+      height: calc(100% - 42px);
+      overflow: auto;
+      margin: 0;
+      padding: 12px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: Consolas, "Cascadia Mono", monospace;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .side {
+      padding: 12px;
+      display: grid;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 13px;
+      min-height: 0;
+      overflow-y: auto;
+    }
+    .status {
+      color: var(--accent);
+      font-weight: 650;
+    }
+    .panel-title {
+      color: var(--text);
+      font-weight: 650;
+      margin-top: 4px;
+    }
+    .grid {
+      display: grid;
+      gap: 8px;
+    }
+    .grid.commands {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .grid.single {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .grid.wide {
+      grid-template-columns: 1fr auto;
+    }
+    .hint {
+      color: var(--muted);
+      line-height: 1.4;
+    }
+    .line {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+    }
+    .mini {
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .calibration {
+      display: grid;
+      gap: 8px;
+    }
+    #gazeCanvas {
+      width: 100%;
+      height: 250px;
+      display: block;
+      background: #0c1014;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+    }
+    #localVideo {
+      width: 100%;
+      max-height: 220px;
+      object-fit: cover;
+      display: none;
+      background: #080b0e;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      transform: scaleX(-1);
+    }
+    .gaze-readout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      font-family: Consolas, "Cascadia Mono", monospace;
+      font-size: 12px;
+    }
+    .gaze-readout div {
+      padding: 6px 8px;
+      background: #12161a;
+      border-radius: 4px;
+    }
+    .cal-buttons {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 6px;
+    }
+    .cal-buttons button {
+      height: 32px;
+      padding: 0 4px;
+      font-size: 12px;
+    }
+    .cal-buttons button.recorded {
+      border-color: var(--ok);
+      color: var(--ok);
+    }
+    @media (max-width: 980px) {
+      main { grid-template-columns: 1fr; height: auto; }
+      section { min-height: 340px; }
+      .grid.commands { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 560px) {
+      header { align-items: flex-start; flex-direction: column; }
+      .toolbar { width: 100%; }
+      button, select, input { width: 100%; }
+      .grid.commands, .grid.single, .grid.wide, .line { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>hello_world 本地电机测试</h1>
+    <div class="toolbar">
+      <select id="baud">
+        <option value="115200" selected>115200</option>
+      </select>
+      <button id="connect" class="primary">连接串口</button>
+      <button id="disconnect">断开</button>
+      <button id="clear">清空日志</button>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <div class="log-head">
+        <span>实时日志</span>
+        <span id="state" class="status">未连接</span>
+      </div>
+      <pre id="log"></pre>
+    </section>
+
+    <section>
+      <div class="side-head">电机测试命令</div>
+      <div class="side">
+        <div class="hint">
+          这是给 <code>hello_world</code> 工程用的本地串口面板。先点“连接串口”，再点按钮。
+        </div>
+
+        <div class="panel-title">整体动作</div>
+        <div class="grid commands">
+          <button data-cmd="f" class="ok">前进 f</button>
+          <button data-cmd="b">后退 b</button>
+          <button data-cmd="l">左转 l</button>
+          <button data-cmd="r">右转 r</button>
+          <button data-cmd="s" class="danger">刹车 s</button>
+          <button data-cmd="t">查看转弯时间 t</button>
+        </div>
+
+        <div class="panel-title">单轮测试</div>
+        <div class="grid single">
+          <button data-cmd="1">左轮正转 1</button>
+          <button data-cmd="2">左轮反转 2</button>
+          <button data-cmd="3">右轮正转 3</button>
+          <button data-cmd="4">右轮反转 4</button>
+        </div>
+
+        <div class="panel-title">转弯时间</div>
+        <div class="grid">
+          <div class="mini">可用于校准转弯自动刹车时间，例：TL1000 / TR1000 / T1200</div>
+          <div class="line">
+            <input id="cmd" value="TL800" spellcheck="false">
+            <button id="send">发送</button>
+          </div>
+        </div>
+
+        <div class="panel-title">帮助</div>
+        <div class="hint">
+          <div>1/2/3/4：单独测试左轮/右轮正反转。</div>
+          <div>f/b/l/r：测试前进、后退、左转、右转。</div>
+          <div>s：立即刹车，t：查看转弯时间。</div>
+        </div>
+
+        <div class="panel-title">摄像头瞳孔校准</div>
+        <div class="hint">连接串口后，固件输出的 PUPIL,x,y 会实时显示。请依次看向五个方向，再点击对应按钮记录当前位置。</div>
+        <div class="calibration">
+          <canvas id="gazeCanvas" width="320" height="250"></canvas>
+          <video id="localVideo" autoplay playsinline muted></video>
+          <div class="grid wide">
+            <button id="openCamera">打开电脑摄像头画面</button>
+            <button id="closeCamera">关闭画面</button>
+          </div>
+          <div class="mini">电脑摄像头画面仅用于校准安装位置；ESP32 当前固件没有提供视频流，只通过串口输出识别结果。</div>
+          <div class="gaze-readout">
+            <div>原始坐标：<span id="rawPupil">等待数据</span></div>
+            <div>方向：<span id="gazeDirection">未知</span></div>
+            <div>样本数：<span id="sampleCount">0</span></div>
+            <div>校准状态：<span id="calStatus">未开始</span></div>
+          </div>
+          <div class="cal-buttons">
+            <button data-cal="left">记录左</button>
+            <button data-cal="center">记录中心</button>
+            <button data-cal="right">记录右</button>
+            <button data-cal="up">记录上</button>
+            <button data-cal="down">记录下</button>
+            <button id="clearCalibration" class="danger">清除校准</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const logEl = document.getElementById("log");
+    const stateEl = document.getElementById("state");
+    const connectBtn = document.getElementById("connect");
+    const disconnectBtn = document.getElementById("disconnect");
+    const clearBtn = document.getElementById("clear");
+    const baudEl = document.getElementById("baud");
+    const sendBtn = document.getElementById("send");
+    const cmdEl = document.getElementById("cmd");
+    const canvas = document.getElementById("gazeCanvas");
+    const canvasCtx = canvas.getContext("2d");
+    const rawPupilEl = document.getElementById("rawPupil");
+    const gazeDirectionEl = document.getElementById("gazeDirection");
+    const sampleCountEl = document.getElementById("sampleCount");
+    const calStatusEl = document.getElementById("calStatus");
+    const localVideo = document.getElementById("localVideo");
+    const openCameraBtn = document.getElementById("openCamera");
+    const closeCameraBtn = document.getElementById("closeCamera");
+
+    let port;
+    let reader;
+    let writer;
+    let keepReading = false;
+    let receiveRemainder = "";
+    let pupil = null;
+    let pupilSamples = [];
+    let calibration = JSON.parse(localStorage.getItem("wheelchairPupilCalibration") || "{}");
+    let cameraStream;
+    let eyePosition = { x: 0.5, y: 0.5 };
+    let targetEyePosition = { x: 0.5, y: 0.5 };
+
+    function append(text) {
+      logEl.textContent += text;
+      logEl.scrollTop = logEl.scrollHeight;
+      parseSerialText(text);
+    }
+
+    function setState(text) {
+      stateEl.textContent = text;
+    }
+
+    async function connect() {
+      if (!("serial" in navigator)) {
+        append("当前浏览器不支持 Web Serial，请使用 Chrome 或 Edge。\n");
+        return;
+      }
+
+      port = await navigator.serial.requestPort();
+      await port.open({
+        baudRate: Number(baudEl.value),
+        dataBits: 8,
+        stopBits: 1,
+        parity: "none",
+        flowControl: "none"
+      });
+
+      writer = port.writable.getWriter();
+      keepReading = true;
+      setState("已连接");
+
+      const decoder = new TextDecoderStream();
+      port.readable.pipeTo(decoder.writable).catch(() => {});
+      reader = decoder.readable.getReader();
+
+      append("\n--- serial connected ---\n");
+      while (keepReading) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        if (value) append(value);
+      }
+    }
+
+    async function disconnect() {
+      keepReading = false;
+      try { if (reader) await reader.cancel(); } catch {}
+      try { if (reader) reader.releaseLock(); } catch {}
+      try { if (writer) writer.releaseLock(); } catch {}
+      try { if (port) await port.close(); } catch {}
+      reader = null;
+      writer = null;
+      port = null;
+      setState("未连接");
+      append("\n--- serial disconnected ---\n");
+    }
+
+    async function sendLine(text) {
+      if (!writer) {
+        append("还没有连接串口。\n");
+        return;
+      }
+      const data = new TextEncoder().encode(text + "\n");
+      await writer.write(data);
+      append(`\n>>> ${text}\n`);
+    }
+
+    function parseSerialText(text) {
+      receiveRemainder += text;
+      const lines = receiveRemainder.split(/\r?\n/);
+      receiveRemainder = lines.pop() || "";
+      for (const line of lines) {
+        // Firmware normally prints:
+        // "Eye center: coord=(123,456), ... gaze=LEFT"
+        // PUPIL text is also accepted when enabled in the firmware.
+        const match = line.match(/PUPIL\s*[,=:]\s*(-?\d+)\s*[,; ]\s*(-?\d+)/i)
+          || line.match(/coord\s*=\s*\(\s*(-?\d+)\s*[,;]\s*(-?\d+)\s*\)/i);
+        if (!match) continue;
+        updatePupil(Number(match[1]), Number(match[2]));
+        const direction = line.match(/\bgaze\s*=\s*([A-Z]+)/i);
+        if (direction) {
+          const labels = { LEFT: "左", RIGHT: "右", UP: "上", DOWN: "下", CENTER: "中心" };
+          gazeDirectionEl.textContent = labels[direction[1].toUpperCase()] || direction[1];
+        }
+      }
+    }
+
+    function updatePupil(x, y) {
+      pupil = { x, y, time: Date.now() };
+      pupilSamples.push(pupil);
+      if (pupilSamples.length > 120) pupilSamples.shift();
+      rawPupilEl.textContent = `${x}, ${y}`;
+      sampleCountEl.textContent = String(pupilSamples.length);
+      gazeDirectionEl.textContent = classifyGaze(x, y);
+      targetEyePosition = {
+        x: Math.max(0, Math.min(1, mapX(x) / canvas.width)),
+        y: Math.max(0, Math.min(1, mapY(y) / canvas.height))
+      };
+      drawGaze();
+    }
+
+    function averageRecentSamples() {
+      const samples = pupilSamples.slice(-20);
+      if (!samples.length) return null;
+      return {
+        x: Math.round(samples.reduce((sum, p) => sum + p.x, 0) / samples.length),
+        y: Math.round(samples.reduce((sum, p) => sum + p.y, 0) / samples.length)
+      };
+    }
+
+    function classifyGaze(x, y) {
+      const c = calibration;
+      if (c.left && c.right && c.up && c.down) {
+        const cx = c.center?.x ?? (c.left.x + c.right.x) / 2;
+        const cy = c.center?.y ?? (c.up.y + c.down.y) / 2;
+        const dx = Math.abs(c.right.x - c.left.x) * 0.18;
+        const dy = Math.abs(c.down.y - c.up.y) * 0.18;
+        if (x < cx - dx) return "左";
+        if (x > cx + dx) return "右";
+        if (y < cy - dy) return "上";
+        if (y > cy + dy) return "下";
+        return "中心";
+      }
+      return "未校准";
+    }
+
+    function drawGaze() {
+      const w = canvas.width, h = canvas.height;
+      canvasCtx.clearRect(0, 0, w, h);
+      eyePosition.x += (targetEyePosition.x - eyePosition.x) * 0.16;
+      eyePosition.y += (targetEyePosition.y - eyePosition.y) * 0.16;
+
+      const cx = w / 2;
+      const cy = h / 2 + 2;
+      const rx = Math.min(w * 0.42, 142);
+      const ry = Math.min(h * 0.34, 82);
+
+      // Eye shadow and eyelids.
+      canvasCtx.save();
+      canvasCtx.translate(0, 5);
+      canvasCtx.fillStyle = "rgba(0, 0, 0, 0.35)";
+      canvasCtx.beginPath();
+      canvasCtx.ellipse(cx, cy, rx + 7, ry + 8, 0, 0, Math.PI * 2);
+      canvasCtx.fill();
+      canvasCtx.restore();
+
+      const sclera = canvasCtx.createRadialGradient(cx, cy - 12, 8, cx, cy, rx);
+      sclera.addColorStop(0, "#ffffff");
+      sclera.addColorStop(0.72, "#eef4f8");
+      sclera.addColorStop(1, "#aab8c2");
+      canvasCtx.fillStyle = sclera;
+      canvasCtx.beginPath();
+      canvasCtx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+      canvasCtx.fill();
+
+      // Subtle red veins make the eye position easier to see.
+      canvasCtx.strokeStyle = "rgba(220, 95, 105, 0.28)";
+      canvasCtx.lineWidth = 1;
+      for (const vein of [[-0.72,-0.15,-0.48,-0.08],[-0.66,0.18,-0.45,0.1],[0.72,-0.12,0.48,-0.05],[0.68,0.2,0.45,0.1]]) {
+        canvasCtx.beginPath();
+        canvasCtx.moveTo(cx + vein[0] * rx, cy + vein[1] * ry);
+        canvasCtx.quadraticCurveTo(cx + vein[2] * rx, cy + (vein[1] + vein[3]) * ry, cx + vein[2] * rx, cy + vein[3] * ry);
+        canvasCtx.stroke();
+      }
+
+      const maxIrisX = Math.max(10, rx - 42);
+      const maxIrisY = Math.max(8, ry - 28);
+      const irisX = cx + (eyePosition.x - 0.5) * 2 * maxIrisX;
+      const irisY = cy + (eyePosition.y - 0.5) * 2 * maxIrisY;
+      const irisRadius = Math.min(38, ry * 0.48);
+
+      const iris = canvasCtx.createRadialGradient(irisX - 8, irisY - 10, 2, irisX, irisY, irisRadius);
+      iris.addColorStop(0, "#b7e7f6");
+      iris.addColorStop(0.35, "#3ca8c2");
+      iris.addColorStop(0.78, "#146278");
+      iris.addColorStop(1, "#082d3c");
+      canvasCtx.fillStyle = iris;
+      canvasCtx.beginPath();
+      canvasCtx.arc(irisX, irisY, irisRadius, 0, Math.PI * 2);
+      canvasCtx.fill();
+      canvasCtx.strokeStyle = "rgba(3, 36, 48, 0.9)";
+      canvasCtx.lineWidth = 3;
+      canvasCtx.stroke();
+
+      canvasCtx.strokeStyle = "rgba(210, 248, 255, 0.45)";
+      canvasCtx.lineWidth = 1;
+      for (let i = 0; i < 18; i++) {
+        const angle = (Math.PI * 2 * i) / 18;
+        canvasCtx.beginPath();
+        canvasCtx.moveTo(irisX + Math.cos(angle) * 7, irisY + Math.sin(angle) * 7);
+        canvasCtx.lineTo(irisX + Math.cos(angle) * (irisRadius - 3), irisY + Math.sin(angle) * (irisRadius - 3));
+        canvasCtx.stroke();
+      }
+
+      canvasCtx.fillStyle = "#05090b";
+      canvasCtx.beginPath();
+      canvasCtx.arc(irisX, irisY, irisRadius * 0.38, 0, Math.PI * 2);
+      canvasCtx.fill();
+      canvasCtx.fillStyle = "rgba(255,255,255,0.9)";
+      canvasCtx.beginPath();
+      canvasCtx.arc(irisX - irisRadius * 0.3, irisY - irisRadius * 0.32, irisRadius * 0.13, 0, Math.PI * 2);
+      canvasCtx.fill();
+
+      // Show recorded calibration points as small colored rings on the eye.
+      const c = calibration;
+      for (const [name, color] of [["left","#4fb3ff"],["center","#69d18c"],["right","#4fb3ff"],["up","#c084fc"],["down","#c084fc"]]) {
+        if (!c[name]) continue;
+        const mx = mapX(c[name].x) / w;
+        const my = mapY(c[name].y) / h;
+        const markerX = cx + (mx - 0.5) * 2 * maxIrisX;
+        const markerY = cy + (my - 0.5) * 2 * maxIrisY;
+        canvasCtx.strokeStyle = color;
+        canvasCtx.lineWidth = 2;
+        canvasCtx.beginPath();
+        canvasCtx.arc(markerX, markerY, 5, 0, Math.PI * 2);
+        canvasCtx.stroke();
+      }
+
+      // Eyelid outlines.
+      canvasCtx.strokeStyle = "#64727d";
+      canvasCtx.lineWidth = 3;
+      canvasCtx.beginPath();
+      canvasCtx.ellipse(cx, cy, rx, ry, 0, Math.PI, Math.PI * 2);
+      canvasCtx.stroke();
+      canvasCtx.beginPath();
+      canvasCtx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI);
+      canvasCtx.stroke();
+    }
+
+    function mapX(x) {
+      const lo = calibration.left?.x ?? 0;
+      const hi = calibration.right?.x ?? 240;
+      return Math.max(8, Math.min(canvas.width - 8, ((x - lo) / ((hi - lo) || 1)) * (canvas.width - 16) + 8));
+    }
+
+    function mapY(y) {
+      const lo = calibration.up?.y ?? 0;
+      const hi = calibration.down?.y ?? 240;
+      return Math.max(8, Math.min(canvas.height - 8, ((y - lo) / ((hi - lo) || 1)) * (canvas.height - 16) + 8));
+    }
+
+    function refreshCalibrationUi() {
+      const names = ["left", "center", "right", "up", "down"];
+      for (const name of names) {
+        const btn = document.querySelector(`[data-cal="${name}"]`);
+        if (btn) btn.classList.toggle("recorded", Boolean(calibration[name]));
+      }
+      const count = Object.keys(calibration).length;
+      calStatusEl.textContent = count === 5 ? "完成五点校准" : `已记录 ${count}/5`;
+      drawGaze();
+    }
+
+    function animateEye() {
+      drawGaze();
+      requestAnimationFrame(animateEye);
+    }
+
+    document.querySelectorAll("[data-cal]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const avg = averageRecentSamples();
+        if (!avg) {
+          calStatusEl.textContent = "没有 PUPIL 数据";
+          return;
+        }
+        calibration[btn.dataset.cal] = avg;
+        localStorage.setItem("wheelchairPupilCalibration", JSON.stringify(calibration));
+        append(`\n[校准] ${btn.dataset.cal}: ${avg.x},${avg.y}\n`);
+        refreshCalibrationUi();
+      });
+    });
+    document.getElementById("clearCalibration").addEventListener("click", () => {
+      calibration = {};
+      localStorage.removeItem("wheelchairPupilCalibration");
+      refreshCalibrationUi();
+    });
+    openCameraBtn.addEventListener("click", async () => {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        append("\n浏览器不支持电脑摄像头访问。\n");
+        return;
+      }
+      try {
+        cameraStream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
+        localVideo.srcObject = cameraStream;
+        localVideo.style.display = "block";
+        append("\n--- 电脑摄像头已打开（仅预览）---\n");
+      } catch (err) {
+        append(`\n打开电脑摄像头失败: ${err.message}\n`);
+      }
+    });
+    closeCameraBtn.addEventListener("click", () => {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+        cameraStream = null;
+      }
+      localVideo.srcObject = null;
+      localVideo.style.display = "none";
+    });
+    refreshCalibrationUi();
+    animateEye();
+
+    connectBtn.addEventListener("click", () => connect().catch(err => append(`连接失败: ${err.message}\n`)));
+    disconnectBtn.addEventListener("click", () => disconnect());
+    clearBtn.addEventListener("click", () => { logEl.textContent = ""; });
+    sendBtn.addEventListener("click", () => sendLine(cmdEl.value).catch(err => append(`发送失败: ${err.message}\n`)));
+    cmdEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        sendLine(cmdEl.value).catch(err => append(`发送失败: ${err.message}\n`));
+      }
+    });
+
+    document.querySelectorAll("[data-cmd]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const cmd = btn.dataset.cmd;
+        cmdEl.value = cmd;
+        sendLine(cmd).catch(err => append(`发送失败: ${err.message}\n`));
+      });
+    });
+  </script>
+</body>
+</html>
